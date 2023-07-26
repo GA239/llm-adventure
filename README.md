@@ -1,2 +1,1 @@
 # llm-adventure
-llm-adventure

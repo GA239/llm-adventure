@@ -1,2 +1,8 @@
-langchain[all]
+langchain
 openai
+python-dotenv
+huggingface-hub
+transformers
+sentencepiece
+cohere
+replicate
