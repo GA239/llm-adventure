@@ -1,5 +1,3 @@
-import logging
-
 from dotenv import load_dotenv, find_dotenv
 from langchain import ConversationChain
 
@@ -25,10 +23,12 @@ into a single sentence, ten words.
 """
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     load_dotenv(find_dotenv(raise_error_if_not_found=True))
 
-    llm = get_model("Replicate", **get_default_kwargs("Replicate"))
+    llm = get_model(
+        "HuggingFace_mbzai_lamini_flan",
+        **get_default_kwargs("HuggingFace_mbzai_lamini_flan")
+    )
 
     conversation = ConversationChain(llm=llm, verbose=True)
-    logging.info(conversation.run(prompt))
+    print(conversation.run(prompt))

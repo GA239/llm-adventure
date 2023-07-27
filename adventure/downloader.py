@@ -2,8 +2,8 @@ from huggingface_hub import snapshot_download
 import os
 
 model_path = "../models"
-repo_id = "bigscience"
-model_name = "bloom"
+repo_id = "TheBloke"
+model_name = "Llama-2-70B-chat-GPTQ"
 
 snapshot_download(
     repo_id=os.path.join(repo_id, model_name),
