@@ -4,6 +4,7 @@ from functools import partial
 import openai
 import torch
 from langchain import OpenAI, HuggingFaceHub
+from langchain.chat_models import ChatOpenAI
 from langchain.llms import CTransformers, HuggingFacePipeline, Replicate, Cohere
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaForCausalLM, pipeline, BitsAndBytesConfig
 
@@ -22,10 +23,11 @@ def get_model(name, **kwargs):
 
 def get_default_kwargs(name):
     return {
-        "Replicate": {"temperature": 0.1, "max_length": 100, "top_p": 1},
-        "HuggingFace_google_flan": {"temperature": 0.3, "max_length": 110},
-        "HuggingFace_mbzai_lamini_flan": {"max_length": 512, "temperature": 0.1},
-        "Local_lama": {'max_new_tokens': 32, 'repetition_penalty': 3.0, "temperature": 0.1},
+        "OpenAI": {"temperature": 0.7},
+        "Replicate": {"temperature": 0.7, "max_length": 100, "top_p": 1},
+        "HuggingFace_google_flan": {"temperature": 0.5, "max_length": 1000},
+        "HuggingFace_mbzai_lamini_flan": {"max_length": 512, "temperature": 0.7},
+        "Local_lama": {'max_new_tokens': 32, 'repetition_penalty': 3.0, "temperature": 0.6},
     }.get(name, {})
 
 
@@ -46,6 +48,7 @@ def get_replicate_model(**kwargs):
 def get_openai_model(**kwargs):  # expensive
     openai.api_key = os.getenv('OPENAI_API_KEY')
     return OpenAI(**kwargs)
+    # return ChatOpenAI(**kwargs)
 
 
 def get_cohere_model(**kwargs):  # API limitation: 5 calls per minute
@@ -53,7 +56,8 @@ def get_cohere_model(**kwargs):  # API limitation: 5 calls per minute
 
 
 def get_local_model_path(model_name):
-    path = "../../models/"
+    # path = "../../models/"
+    path = "./models/"
     model_path = os.path.join(path, model_name)
     return model_path
 
