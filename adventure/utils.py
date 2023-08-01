@@ -23,7 +23,7 @@ def get_model(name, **kwargs):
 
 def get_default_kwargs(name):
     return {
-        "OpenAI": {"temperature": 0.7},
+        "OpenAI": {"temperature": 0.9},
         "Replicate": {"temperature": 0.7, "max_length": 100, "top_p": 1},
         "HuggingFace_google_flan": {"temperature": 0.5, "max_length": 1000},
         "HuggingFace_mbzai_lamini_flan": {"max_length": 512, "temperature": 0.7},

@@ -2,7 +2,17 @@ from dotenv import load_dotenv, find_dotenv
 from langchain import ConversationChain
 from langchain import PromptTemplate
 from langchain.memory import ConversationSummaryMemory
-from langchain.prompts.chat import ChatPromptTemplate
+
+from langchain.prompts.chat import ChatPromptTemplate, BasePromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from pydantic import BaseModel, Field, validator
+from langchain.chains import LLMChain
+from langchain.schema import BaseOutputParser
 from adventure.utils import get_model, get_default_kwargs
 from langchain.schema import (
     AIMessage,
@@ -11,7 +21,10 @@ from langchain.schema import (
 )
 from langchain.cache import InMemoryCache
 import langchain
+import json
+from langchain.output_parsers import PydanticOutputParser
 
+load_dotenv(find_dotenv(raise_error_if_not_found=True))
 
 # Player will use triple backticks ```like this``` to ask questions about the riddle and to provide answers.
 
@@ -66,8 +79,7 @@ Player: ```{input}```
 
 TEMPLATE = system_prompt + history_concatenation
 
-if __name__ == "__main__":
-    load_dotenv(find_dotenv(raise_error_if_not_found=True))
+def main():
     langchain.llm_cache = InMemoryCache()
 
     # model_name = "Replicate"
@@ -115,3 +127,58 @@ if __name__ == "__main__":
     print(conversation.run("Hello!, introduce yourself and ask me a riddle about programming."))
     while 1:
         print(conversation.run(input(">>>")))
+
+
+class JsonOutputParser(BaseOutputParser):
+    """Parse the output of an LLM call to a comma-separated list."""
+    def parse(self, text: str):
+        """Parse the output of an LLM call."""
+        return json.loads(text)
+
+
+# Define your desired data structure.
+class Riddle(BaseModel):
+    riddle: str = Field(description="the riddle about programming")
+    answer: str = Field(description="the answer to the riddle")
+
+    # You can add custom validation logic easily with Pydantic.
+    # @validator("setup")
+    # def question_ends_with_question_mark(cls, field):
+    #     if field[-1] != "?":
+    #         raise ValueError("Badly formed question!")
+    #     return field
+
+
+def generate_riddle(model_name="OpenAI"):
+    prompt = """
+    I want you to act as if you are a classic text adventure game and we are playing. 
+    Your character is an experienced programmer. 
+    Your task as a character is to generate a riddle about programming or programming languages.
+
+    The riddle should be short and precise.
+    The riddle should not contain the answer.
+    The riddle should be solvable by a human.    
+    """
+
+    parser = PydanticOutputParser(pydantic_object=Riddle)
+
+    prompt = PromptTemplate(
+        template=prompt + "\n{format_instructions}\n{query}\n",
+        input_variables=["query"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
+    _input = prompt.format_prompt(query="generate a riddle about programming.")
+
+    llm = get_model(
+        model_name,
+        **get_default_kwargs(model_name)
+    )
+    for _ in range(5):
+        output = llm(_input.to_string())
+        q = parser.parse(output)
+        print(q.dict())
+
+
+
+if __name__ == "__main__":
+    generate_riddle()
