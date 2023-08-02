@@ -47,8 +47,8 @@ def get_replicate_model(**kwargs):
 
 def get_openai_model(**kwargs):  # expensive
     openai.api_key = os.getenv('OPENAI_API_KEY')
-    return OpenAI(**kwargs)
-    # return ChatOpenAI(**kwargs)
+    # return OpenAI(**kwargs)
+    return ChatOpenAI(**kwargs)
 
 
 def get_cohere_model(**kwargs):  # API limitation: 5 calls per minute
@@ -71,7 +71,7 @@ def get_local_gpt2_model(**kwargs):
         "text-generation",
         model=llm,
         tokenizer=tokenizer,
-        temperature=0.1,
+        # temperature=0.1,
         max_new_tokens=30,
         **kwargs
     )
