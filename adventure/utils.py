@@ -12,6 +12,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaFo
 def get_model(name, **kwargs):
     return {
         "OpenAI": get_openai_model,
+        "ChatOpenAI": get_chat_openai_model,
         "Replicate": get_replicate_model,
         "Cohere": get_cohere_model,
         "HuggingFace_google_flan": get_google_flan_t5_xxl,
@@ -47,7 +48,11 @@ def get_replicate_model(**kwargs):
 
 def get_openai_model(**kwargs):  # expensive
     openai.api_key = os.getenv('OPENAI_API_KEY')
-    # return OpenAI(**kwargs)
+    return OpenAI(**kwargs)
+
+
+def get_chat_openai_model(**kwargs):  # expensive
+    openai.api_key = os.getenv('OPENAI_API_KEY')
     return ChatOpenAI(**kwargs)
 
 

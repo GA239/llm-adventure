@@ -146,13 +146,14 @@ class Riddle(BaseModel):
     answer: str = Field(description="the answer to the riddle")
 
 
-def generate_riddle(model_name="OpenAI") -> Riddle:
+def get_riddle_generator():
     sys_prompt = """
     You are a world class algorithm for generating riddles. 
     Your task is to generate a riddle about programming.
-    
+
     Your knowledge of programming languages, data structures, and algorithms should be used to generate riddle.     
     """
+    model_name = "OpenAI"
     kwargs = {**get_default_kwargs(model_name), "temperature": 0.8}
     llm = get_model(model_name, **kwargs)
 
@@ -171,11 +172,15 @@ def generate_riddle(model_name="OpenAI") -> Riddle:
         Riddle, llm, prompt,
         verbose=True
     )
+    return chain
 
+
+def generate_riddle(*args, **kwargs) -> Riddle:
+    chain = get_riddle_generator()
     for _ in range(1):
         try:
             output = chain.run("generate a riddle about programming.")
-            return output
+            return output.riddle
         except json.decoder.JSONDecodeError:
             continue
     raise ValueError("Can't parse the output")
@@ -221,6 +226,8 @@ def check_riddle(riddle_config: dict, model_name: str = "OpenAI"):
      - "answer" - actual answer.
      - "player_answer" - answer provided by player
     """
+    # TODO: add input as arguments in the template
+
     # system_message_prompt = SystemMessagePromptTemplate.from_template(template)
     # human_template = "{text}"
     # human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
@@ -286,16 +293,44 @@ def simple_game_play_loop(model_name="OpenAI"):
     print("You lost!")
 
 
+def simple_agent(model_name="ChatOpenAI"):
+    from langchain.agents import Tool
+    from langchain.agents import AgentType
+    from langchain.agents import initialize_agent
+    from langchain.memory import ConversationBufferMemory
+
+    riddle_chain = get_riddle_generator()
+    tools = [
+        Tool(
+            name="Generate riddle",
+            func=riddle_chain.run,
+            description="useful if you want to generate a riddle about",
+        ),
+    ]
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    kwargs = {**get_default_kwargs(model_name), "temperature": 0.4}
+    llm = get_model(model_name, **kwargs)
+
+    agent_chain = initialize_agent(
+        tools, llm,
+        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+        memory=memory,
+        verbose=True)
+    while True:
+        print(agent_chain.run(input(">>>")))
+
+
 if __name__ == "__main__":
-    print(generate_riddle(model_name="OpenAI"))
+    # simple_agent(model_name="OpenAI")
+    print(generate_riddle())
 
-    # print(check_riddle(
-    #     model_name="OpenAI",
-    #     riddle_config={
-    #         'riddle': 'What has a head and a tail but no body?',
-    #         'answer': 'A coin',
-    #         "player_answer": "coin"
-    #     }
-    # ))
+# print(check_riddle(
+#     model_name="OpenAI",
+#     riddle_config={
+#         'riddle': 'What has a head and a tail but no body?',
+#         'answer': 'A coin',
+#         "player_answer": "coin"
+#     }
+# ))
 
-    # simple_game_play_loop(model_name="OpenAI")
+# simple_game_play_loop(model_name="OpenAI")
