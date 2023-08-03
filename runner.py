@@ -131,61 +131,6 @@ def main():
         print(conversation.run(input(">>>")))
 
 
-class JsonOutputParser(BaseOutputParser):
-    """Parse the output of an LLM call to a comma-separated list."""
-
-    def parse(self, text: str):
-        """Parse the output of an LLM call."""
-        return json.loads(text)
-
-
-# Define your desired data structure.
-class Riddle(BaseModel):
-    """A riddle about programming."""
-    riddle: str = Field(description="the riddle about programming")
-    answer: str = Field(description="the answer to the riddle")
-
-
-def get_riddle_generator():
-    sys_prompt = """
-    You are a world class algorithm for generating riddles. 
-    Your task is to generate a riddle about programming.
-
-    Your knowledge of programming languages, data structures, and algorithms should be used to generate riddle.     
-    """
-    model_name = "OpenAI"
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.8}
-    llm = get_model(model_name, **kwargs)
-
-    prompt_msgs = [
-        SystemMessage(content=sys_prompt),
-        HumanMessagePromptTemplate.from_template("{input}"),
-        HumanMessagePromptTemplate.from_template(
-            "Hint: The riddle should be short."),
-        HumanMessagePromptTemplate.from_template(
-            "Hint: The riddle should not contain the answer."),
-        HumanMessagePromptTemplate.from_template(
-            "Hint: The riddle should be solvable by a human."),
-    ]
-    prompt = ChatPromptTemplate(messages=prompt_msgs)
-    chain = create_structured_output_chain(
-        Riddle, llm, prompt,
-        verbose=True
-    )
-    return chain
-
-
-def generate_riddle(*args, **kwargs) -> Riddle:
-    chain = get_riddle_generator()
-    for _ in range(1):
-        try:
-            output = chain.run("generate a riddle about programming.")
-            return output.riddle
-        except json.decoder.JSONDecodeError:
-            continue
-    raise ValueError("Can't parse the output")
-
-
 class RiddleCheck(BaseModel):
     score: str = Field(description="should be one number from 0 to 1. "
                                    "where 0 is completely incorrect and 1 is completely correct.")
@@ -322,7 +267,7 @@ def simple_agent(model_name="ChatOpenAI"):
 
 if __name__ == "__main__":
     # simple_agent(model_name="OpenAI")
-    print(generate_riddle())
+    # print(generate_riddle())
 
 # print(check_riddle(
 #     model_name="OpenAI",
@@ -333,4 +278,4 @@ if __name__ == "__main__":
 #     }
 # ))
 
-# simple_game_play_loop(model_name="OpenAI")
+    simple_game_play_loop(model_name="OpenAI")
