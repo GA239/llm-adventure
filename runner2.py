@@ -154,8 +154,9 @@ def execute_room_semi_loop(conversation: ConversationChain, player_input: str):
 
 def room_game_loop(topic: str = "programming"):
     riddle = generate_riddle(topic=topic)
+    riddle = riddle.dict()
     print(f"Debug::: {riddle}")
-    conversation = room_chain(topic=topic, riddle=riddle.dict())
+    conversation = room_chain(topic=topic, riddle=riddle)
 
     start = execute_room_semi_loop(conversation, "Hello!")
     print(start["reply"])
@@ -167,6 +168,13 @@ def room_game_loop(topic: str = "programming"):
 
         action, state = rpl["action"], rpl["new_state"]
         if state == "finished":
+            break
+
+        similarity = float(rpl["similarity"])
+        if similarity > 0.65:
+            print("You guessed almost correctly!")
+            answer = riddle["answer"]
+            print(f"The answer is {answer}")
             break
 
     print("Thank you for playing!, "
