@@ -37,95 +37,6 @@ from langchain.utilities import GoogleSearchAPIWrapper
 load_dotenv(find_dotenv(raise_error_if_not_found=True))
 
 
-ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE = """
-You are an expert in {topic}. You are following the following rules:
-- You must not refer to yourself in any way.
-- You can only answer questions that are asked in the context of the game.
-- You can't pretend a player.
-- Be short and precise in your answers.
-
-You also follow the rules of the Adventure Game Room.
-The rules of Adventure Game Room:
-
-- You are talking with a player. 
-- The player is trying to guess a riddle.
-- You have a riddle that player need to find the solution to. The riddle: "{riddle}". 
-- The riddle is related to {topic}.
-- You have an answer to the riddle. The answer: "{answer}".
-- The player can ask you questions about the riddle. You can only give clues
-- The player can ask you questions about the answer. You can only give clues
-- You NEVER say the precise answer to the player. You can only give clues
-- You should choose action from available actions based on the players' input and history of conversation.
-
-The following actions are available.
-{actions}
-- You should choose the next state from available states based on the action.
-
-The following states are available
-{states}
-Your output response always is in json format with the following fields:
-    - "action": string, \\ The action to take. Must be one of the valid actions
-    - "reply": string, \\ Your reply to player. You must say clues in your own words instead of just copying them.
-    - "new_state": string, \\ The new state, after this action. Must be one of the valid states
-"""
-
-states_str = """
-* guessing_riddle: Whatever the player says, you must compare it to the answer and make a decision if the main idea is the same. if the main idea is the same, player guessed the riddle correctly, otherwise, player guessed the riddle incorrectly. 
-* finished: you should just say "Over" and stop the game
-"""
-
-actions_str = """
-* start_game: only in the initial state, start the game by giving player the riddle
-* guess_correct: if player guessed correctly. The next state is "finished"
-* guess_incorrect: if player guessed incorrectly. You should give player a clue. The next state is "guessing_riddle"
-"""
-
-history_concatenation = """Current conversation:
-{history}
-Player: ```{input}```
-"""
-
-
-def main(topic: str = "programming"):
-    langchain.llm_cache = InMemoryCache()
-
-    # todo: get riddle
-    riddle = {
-        "riddle": "What is the programming language whose syntax doesn't need semicolons?",
-        "answer": "Python"
-    }
-
-    model_name = "OpenAI"
-    # model_name = "Replicate"
-    # model_name = "Cohere"
-    # model_name = "HuggingFace_google_flan"
-    # model_name = "HuggingFace_mbzai_lamini_flan"
-    # model_name = "Local_gpt2"
-    # model_name = "Local_lama"
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.3}
-    llm = get_model(model_name, **kwargs)
-
-    system_prompt = ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
-        topic=topic,
-        riddle=riddle["riddle"],
-        answer=riddle["answer"],
-        actions=actions_str,
-        states=states_str
-    )
-
-    template = system_prompt + history_concatenation
-    prompt = PromptTemplate(input_variables=["history", "input"], template=template)
-    memory = ConversationSummaryMemory(llm=llm)
-    conversation = ConversationChain(
-        llm=llm,
-        prompt=prompt,
-        memory=memory,
-        verbose=True
-    )
-    print(conversation.run("Hello!"))
-    while 1:
-        print(conversation.run(input(">>>")))
-
 
 class RiddleCheck(BaseModel):
     score: str = Field(description="should be one number from 0 to 1. "
@@ -275,4 +186,4 @@ if __name__ == "__main__":
     # ))
 
     # simple_game_play_loop(model_name="OpenAI")
-    main()
+    room_game_loop()
