@@ -37,7 +37,6 @@ from langchain.utilities import GoogleSearchAPIWrapper
 load_dotenv(find_dotenv(raise_error_if_not_found=True))
 
 
-
 class RiddleCheck(BaseModel):
     score: str = Field(description="should be one number from 0 to 1. "
                                    "where 0 is completely incorrect and 1 is completely correct.")
@@ -172,6 +171,62 @@ def simple_agent(model_name="ChatOpenAI"):
         print(agent_chain.run(input(">>>")))
 
 
+from langchain import (
+    LLMMathChain,
+    OpenAI,
+    SerpAPIWrapper,
+    SQLDatabase,
+)
+from langchain.agents import initialize_agent, Tool
+from langchain.agents import AgentType
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import MessagesPlaceholder
+from langchain.memory import ConversationBufferMemory
+from langchain.agents import Agent
+
+
+def simple_agent_2():
+    llm = ChatOpenAI(temperature=0)
+    conversation = ConversationChain(
+        llm=llm,
+        # memory=memory,
+        verbose=True
+    )
+
+    llm_math_chain = LLMMathChain.from_llm(llm=llm, verbose=True)
+
+    tools = [
+        Tool(
+            name="Calculator",
+            func=llm_math_chain.run,
+            description="useful for when you need to answer questions about math",
+        ),
+        Tool(
+            name="General_Answer",
+            func=conversation.run,
+            description="the default tool for answering questions",
+        ),
+    ]
+    agent_kwargs = {
+        "extra_prompt_messages": [
+            MessagesPlaceholder(variable_name="memory"),
+            MessagesPlaceholder(variable_name="Lol")
+        ],
+    }
+    memory = ConversationBufferMemory(memory_key="memory", return_messages=True)
+    agent = initialize_agent(
+        tools,
+        llm,
+        agent=AgentType.OPENAI_FUNCTIONS,
+        verbose=True,
+        agent_kwargs=agent_kwargs,
+        memory=memory,
+    )
+    print(agent.run("hi, I'm Andrei"))
+    agent.run("My age is 25")
+    agent.run("multiply my age by 2")
+
+
 if __name__ == "__main__":
     # simple_agent(model_name="OpenAI")
     # print(generate_riddle())
@@ -186,4 +241,4 @@ if __name__ == "__main__":
     # ))
 
     # simple_game_play_loop(model_name="OpenAI")
-    room_game_loop()
+    simple_agent_2()

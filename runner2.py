@@ -62,8 +62,9 @@ check_riddle = [
     "to the main idea of the correct answer as a value between 0 and 1. Ignore history to calculate the similarity",
 ]
 check_riddle_flow = ". ".join(check_riddle)
+
 states_str = f"""
-* guessing_riddle: Whatever the player says, you must check an answer by the following algorithm: {check_riddle_flow}
+* guessing_riddle: if player makes a guess, compare it with the correct answer. If player, asked a question, answer it by giving a clue.
 * finished: you should stop the game
 """
 
@@ -74,7 +75,6 @@ actions_str = """
 """
 
 history_concatenation = """Current conversation:
-{history}
 Player: ```{input}```
 """
 
@@ -125,14 +125,15 @@ def room_chain(topic: str = "programming", riddle: dict = None):
 
     prompt = PromptTemplate(
         template=template,
-        input_variables=["history", "input"],
+        # input_variables=["history", "input"],
+        input_variables=["input"],
         partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
     )
-    # memory = ConversationSummaryMemory(llm=llm)
-    conversation = ConversationChain(
+    memory = ConversationSummaryMemory(llm=llm)
+    conversation = LLMChain(
         llm=llm,
         prompt=prompt,
-        # memory=memory,
+        memory=memory,
         verbose=True
     )
     return conversation
