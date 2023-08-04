@@ -36,8 +36,8 @@ The rules of Adventure Game Room:
 - You have a riddle that player need to find the solution to. The riddle: "{riddle}". 
 - The riddle is related to {topic}.
 - You have a correct answer to the riddle. The correct answer is "{answer}".
-- The player can ask you questions about the riddle. You can only give clues
-- The player can ask you questions about the answer. You can only give clues
+- The player can ask you questions about the riddle. You can answer the questions about riddle, but don't say the answer.
+- The player can ask you questions about the answer. Don't provide answer. You can only give clues or hints
 - You NEVER say the precise answer to the player. You can only give clues
 - You should choose action from available actions based on the players' input and history of conversation.
 
@@ -55,8 +55,8 @@ The following states are available
 #     "player guessed the riddle correctly, otherwise, player guessed the riddle incorrectly"
 
 check_riddle = [
-    "1. get the main idea of the player's answer using the knowledge about riddle and {topic}",
-    "2. get the main idea of the correct answer using the knowledge about riddle and {topic}",
+    "1. get the main idea of the player's answer as one word. Use the knowledge about the {topic}"
+    "2. get the main idea of the correct answer as one word. Use the knowledge about the {topic}",
     "3. compare the main idea of the player's answer to the main idea of the correct answer",
     "4. Calculate the similarity of the main idea of the player's answer "
     "to the main idea of the correct answer as a value between 0 and 1. Ignore history to calculate the similarity",
@@ -239,4 +239,4 @@ if __name__ == "__main__":
     # r = generate_riddle(topic="programming languages, data structures, and algorithms", chat_model=True)
     # print(r)
     # room_game_loop(topic="programming languages, data structures, and algorithms")
-    room_game_loop(topic="Space")
+    room_game_loop(topic="Astronomy")
