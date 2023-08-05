@@ -110,8 +110,8 @@ def room_chain(topic: str = "programming", riddle: dict = None):
     # model_name = "HuggingFace_mbzai_lamini_flan"
     # model_name = "Local_gpt2"
     # model_name = "Local_lama"
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.3}
-    llm = get_model(model_name, **kwargs)
+    llm = get_model(model_name, temperature=0.3)
+
 
     system_prompt = ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
         topic=topic,
@@ -192,8 +192,8 @@ def get_riddle_generator_chat():
     Hint: The riddle should not contain the answer.
     """
     model_name = "ChatOpenAI"
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.8}
-    llm = get_model(model_name, **kwargs)
+    llm = get_model(model_name, temperature=0.8)
+
 
     prompt_msgs = [
         SystemMessagePromptTemplate.from_template(
@@ -218,8 +218,8 @@ def get_riddle_generator():
     Hint: The riddle should not contain the answer.
     """
     model_name = "OpenAI"
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.8}
-    llm = get_model(model_name, **kwargs)
+    llm = get_model(model_name, temperature=0.8)
+
 
     prompt = PromptTemplate(
         template=sys_prompt + "\n{format_instructions}\n",

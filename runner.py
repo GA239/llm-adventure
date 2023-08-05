@@ -100,8 +100,7 @@ def check_riddle(riddle_config: dict, model_name: str = "OpenAI"):
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
 
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.4}
-    llm = get_model(model_name, **kwargs)
+    llm = get_model(model_name, temperature=0.4)
 
     riddle = json.dumps(riddle_config)
     _input = prompt.format_prompt(query=riddle)
@@ -159,8 +158,7 @@ def simple_agent(model_name="ChatOpenAI"):
         ),
     ]
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    kwargs = {**get_default_kwargs(model_name), "temperature": 0.4}
-    llm = get_model(model_name, **kwargs)
+    llm = get_model(model_name, temperature=0.4)
 
     agent_chain = initialize_agent(
         tools, llm,

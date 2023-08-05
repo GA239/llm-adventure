@@ -10,6 +10,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaFo
 
 
 def get_model(name, **kwargs):
+    q_kwargs = {**_get_default_kwargs(name), **kwargs}
     return {
         "OpenAI": get_openai_model,
         "ChatOpenAI": get_chat_openai_model,
@@ -19,12 +20,12 @@ def get_model(name, **kwargs):
         "HuggingFace_mbzai_lamini_flan": get_mbzai_lamini_flan_t5_783m,
         "Local_gpt2": get_local_gpt2_model,
         "Local_lama": get_local_lama_model,
-    }.get(name)(**kwargs)
+    }.get(name)(**q_kwargs)
 
 
-def get_default_kwargs(name):
+def _get_default_kwargs(name):
     return {
-        "OpenAI": {"temperature": 0.9},
+        "OpenAI": {"temperature": 0.7},
         "Replicate": {"temperature": 0.7, "max_length": 100, "top_p": 1},
         "HuggingFace_google_flan": {"temperature": 0.5, "max_length": 1000},
         "HuggingFace_mbzai_lamini_flan": {"max_length": 512, "temperature": 0.7},
