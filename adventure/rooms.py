@@ -64,6 +64,27 @@ class Room(ABC):
 
     _riddle: dict = None  # {"riddle": str, "answer": str}
 
+    actions_str = """
+    * start_game: only in the initial state, start the game by giving player the riddle
+    * guess_correct: if player guessed correctly. The next state is "finished"
+    * guess_incorrect: if player guessed incorrectly. You should give player a clue. The next state is "guessing_riddle"
+    """
+
+    def _check_riddle_instructions(self):
+        raise NotImplementedError
+
+    @property
+    def states_str(self):
+        return f"""
+        * guessing_riddle: {self._check_riddle_instructions()} 
+        * finished: you should stop the game
+        """
+
+    # Used to be for memory
+    history_concatenation = """Current conversation:
+    Player: ```{input}```
+    """
+
     def __init__(self, room_config: dict):
         self.room_config = room_config
 
@@ -93,16 +114,43 @@ class Room(ABC):
     def generate_riddle(self):
         raise NotImplementedError
 
-    @abstractmethod
-    def _get_room_chain_from_params(self, riddle: dict, topic: str) -> LLMChain:
+    @property
+    def room_prompt_template(self):
         raise NotImplementedError
+
+    def _get_room_chain_from_params(self) -> LLMChain:
+        # TODO: check if this is needed
+        langchain.llm_cache = InMemoryCache()
+        vbs = verbose()
+
+        model_name = "OpenAI"
+        # model_name = "Replicate"
+        # model_name = "Cohere"
+        # model_name = "HuggingFace_google_flan"
+        # model_name = "HuggingFace_mbzai_lamini_flan"
+        # model_name = "Local_gpt2"
+        # model_name = "Local_lama"
+        llm = get_model(model_name, temperature=0.2)
+
+        prompt = PromptTemplate(
+            template=self.room_prompt_template,
+            input_variables=["input"],
+            partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
+        )
+
+        # We don't need memory in this case, although technically It's a conversation
+        conversation = LLMChain(
+            llm=llm,
+            prompt=prompt,
+            # memory=memory,
+            verbose=vbs
+        )
+        return conversation
 
     def _get_room_chain(self) -> LLMChain:
         self.generate_riddle()
-        riddle = self._riddle
-        game_print_debug(f"Debug ::: Riddle :: {riddle}")
-        topic = self.room_config["topic"]
-        return self._get_room_chain_from_params(riddle=riddle, topic=topic)
+        game_print_debug(f"Debug ::: Riddle :: {self._riddle}")
+        return self._get_room_chain_from_params()
 
     @property
     def room_chain(self) -> LLMChain:
@@ -171,21 +219,6 @@ class GeneralRoom(Room):
     {states}
     """
 
-    states_str = f"""
-    * guessing_riddle: if player makes a guess, compare it with the correct answer. If player, asked a question, answer it by giving a clue.
-    * finished: you should stop the game
-    """
-
-    actions_str = """
-    * start_game: only in the initial state, start the game by giving player the riddle
-    * guess_correct: if player guessed correctly. The next state is "finished"
-    * guess_incorrect: if player guessed incorrectly. You should give player a clue. The next state is "guessing_riddle"
-    """
-
-    history_concatenation = """Current conversation:
-    Player: ```{input}```
-    """
-
     def _get_riddle_generator(self) -> LLMChain:
         sys_prompt = """
         You are a world class algorithm for generating riddles. 
@@ -211,42 +244,24 @@ class GeneralRoom(Room):
         game_print_debug(f"chain repl: {type(repl)} : {repl}")
         self._riddle = RiddleParser.parse(repl).dict()
 
-    def _get_room_chain_from_params(self, riddle: dict, topic: str) -> LLMChain:
-        # TODO: check if this is needed
-        langchain.llm_cache = InMemoryCache()
-        vbs = verbose()
+    def _check_riddle_instructions(self):
+        ". ".join([
+            "if player makes a guess, compare it with the correct answer."
+            "If player asked a question, answer it by giving a clue."
+        ])
 
-        model_name = "OpenAI"
-        # model_name = "Replicate"
-        # model_name = "Cohere"
-        # model_name = "HuggingFace_google_flan"
-        # model_name = "HuggingFace_mbzai_lamini_flan"
-        # model_name = "Local_gpt2"
-        # model_name = "Local_lama"
-        llm = get_model(model_name, temperature=0.2)
-
+    @property
+    def room_prompt_template(self) -> str:
         system_prompt = self.ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
-            topic=topic,
-            riddle=riddle["riddle"],
-            answer=riddle["answer"],
+            topic=self.room_config["topic"],
+            riddle=self.riddle,
+            answer=self.answer,
             actions=self.actions_str,
-            states=self.states_str.format(topic=topic)
+            states=self.states_str
         )
 
         template = system_prompt + self.history_concatenation + "\n{format_instructions}\n"
-
-        prompt = PromptTemplate(
-            template=template,
-            # input_variables=["history", "input"],
-            input_variables=["input"],
-            partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
-        )
-        conversation = LLMChain(
-            llm=llm,
-            prompt=prompt,
-            verbose=vbs,
-        )
-        return conversation
+        return template
 
 
 class MathRoom(Room):
@@ -267,6 +282,7 @@ class MathRoom(Room):
     - The player is trying to solve a math problem.
     - You have a math problem that player need to solve. The math problem: "{riddle}".
     - You have a correct answer to the math problem. The correct answer is "{answer}". It's a number.
+    - You should use the term "riddle", talking about math problem.
 
     - Don't provide answer. You can only give clues or hints.
     - You NEVER say the precise answer to the player. You can only give clues
@@ -278,21 +294,6 @@ class MathRoom(Room):
 
     The following states are available
     {states}
-    """
-
-    states_str = f"""
-    * guessing_riddle: if player makes a guess, consider player's input to number and compare it with the correct answer. If player, asked a question, answer it by giving a clue.
-    * finished: you should stop the game
-    """
-
-    actions_str = """
-    * start_game: only in the initial state, start the game by giving player the math problem, but name it "riddle"
-    * guess_correct: if player guessed correctly. The next state is "finished"
-    * guess_incorrect: if player guessed incorrectly. You should give player a clue. The next state is "guessing_riddle"
-    """
-
-    history_concatenation = """Current conversation:
-    Player: ```{input}```
     """
 
     def _get_riddle_generator(self):
@@ -328,43 +329,23 @@ class MathRoom(Room):
     def generate_riddle(self):
         repl = self.riddle_generator({"input": "Generate a math question"})
         game_print_debug(f"chain repl: {type(repl)} : {repl}")
-        self._riddle = repl
+        self._riddle = {"riddle": repl["question"], "answer": repl["answer"]}
 
-    def _get_room_chain_from_params(self, riddle: dict, topic: str = "Math") -> LLMChain:
-        # TODO: check if this is needed
-        langchain.llm_cache = InMemoryCache()
-        vbs = verbose()
+    def _check_riddle_instructions(self):
+        ". ".join([
+            "If player makes a guess, consider player's input as number and compare it with the correct answer."
+            "If player asked a question, answer it by giving a clue."
+        ])
 
-        model_name = "OpenAI"
-        # model_name = "Replicate"
-        # model_name = "Cohere"
-        # model_name = "HuggingFace_google_flan"
-        # model_name = "HuggingFace_mbzai_lamini_flan"
-        # model_name = "Local_gpt2"
-        # model_name = "Local_lama"
-        llm = get_model(model_name, temperature=0.2)
-
+    @property
+    def room_prompt_template(self) -> str:
         system_prompt = self.ADVENTURE_GAME_MATH_ROOM_PROMPT_TEMPLATE.format(
-            topic=topic,
-            riddle=riddle["question"],
-            answer=riddle["answer"],
+            topic=self.room_config["topic"],
+            riddle=self.riddle,
+            answer=self.answer,
             actions=self.actions_str,
             states=self.states_str
         )
 
         template = system_prompt + self.history_concatenation + "\n{format_instructions}\n"
-
-        prompt = PromptTemplate(
-            template=template,
-            input_variables=["input"],
-            partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
-        )
-
-        # We don't need memory in this case, although technically It's a conversation
-        conversation = LLMChain(
-            llm=llm,
-            prompt=prompt,
-            # memory=memory,
-            verbose=vbs
-        )
-        return conversation
+        return template
