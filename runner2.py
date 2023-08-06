@@ -2,7 +2,6 @@ import json
 
 import langchain
 from dotenv import load_dotenv, find_dotenv
-from langchain import ConversationChain
 from langchain import LLMChain
 from langchain import PromptTemplate
 from langchain.cache import InMemoryCache
@@ -17,9 +16,10 @@ from langchain.prompts.chat import (
 )
 from pydantic import BaseModel, Field
 
-from adventure.utils import get_model, get_default_kwargs
+from adventure.utils import get_model
 
 load_dotenv(find_dotenv(raise_error_if_not_found=True))
+__DEBUG__ = True
 
 ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE = """
 You are an expert in {topic}. You are following the following rules:
@@ -49,20 +49,6 @@ The following states are available
 {states}
 """
 
-# * guessing_riddle: Whatever the player says, you must compare it to the answer and make a decision if the main idea is the same. If the main idea is at least similar, player guessed the riddle correctly, otherwise, player guessed the riddle incorrectly.
-
-#     "4. if the main idea of the player's answer is at least similar to main idea of the correct answer, "
-#     "player guessed the riddle correctly, otherwise, player guessed the riddle incorrectly"
-
-check_riddle = [
-    "1. get the main idea of the player's answer as one word. Use the knowledge about the {topic}"
-    "2. get the main idea of the correct answer as one word. Use the knowledge about the {topic}",
-    "3. compare the main idea of the player's answer to the main idea of the correct answer",
-    "4. Calculate the similarity of the main idea of the player's answer "
-    "to the main idea of the correct answer as a value between 0 and 1. Ignore history to calculate the similarity",
-]
-check_riddle_flow = ". ".join(check_riddle)
-
 states_str = f"""
 * guessing_riddle: if player makes a guess, compare it with the correct answer. If player, asked a question, answer it by giving a clue.
 * finished: you should stop the game
@@ -80,15 +66,16 @@ Player: ```{input}```
 
 
 class Riddle(BaseModel):
-    """A riddle about programming."""
-    riddle: str = Field(description="the riddle about programming")
+    """A riddle that need to be solved."""
+    riddle: str = Field(description="the riddle as a question")
     answer: str = Field(description="the answer to the riddle")
 
 
 class RoomLoopAnswer(BaseModel):
     """Room Loop Answer"""
     action: str = Field(description="The action to take. Must be one of the valid actions")
-    similarity: float = Field(description="the similarity of the main idea of the player's answer to the main idea of the correct answer as a value between 0 and 1")
+    similarity: float = Field(
+        description="the similarity of the main idea of the player's answer to the main idea of the correct answer as a value between 0 and 1")
     answer_idea: str = Field(description="the main idea of the player's answer")
     correct_answer_idea: str = Field(description="the main idea of the correct answer")
     reply: str = Field(
@@ -111,7 +98,6 @@ def room_chain(topic: str = "programming", riddle: dict = None):
     # model_name = "Local_gpt2"
     # model_name = "Local_lama"
     llm = get_model(model_name, temperature=0.3)
-
 
     system_prompt = ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
         topic=topic,
@@ -139,7 +125,7 @@ def room_chain(topic: str = "programming", riddle: dict = None):
     return conversation
 
 
-def execute_room_semi_loop(conversation: ConversationChain, player_input: str):
+def execute_room_semi_loop(conversation: LLMChain, player_input: str):
     """Parse the answer from the room loop"""
     for _ in range(2):  # couple of attempts to get a valid response
         try:
@@ -173,7 +159,7 @@ def room_game_loop(topic: str = "programming"):
 
         similarity = float(rpl["similarity"])
         if similarity > 0.65:
-            print("You guessed almost correctly!")
+            print("However, Your guess is almost correct!")
             answer = riddle["answer"]
             print(f"The answer is {answer}")
             break
@@ -194,7 +180,6 @@ def get_riddle_generator_chat():
     model_name = "ChatOpenAI"
     llm = get_model(model_name, temperature=0.8)
 
-
     prompt_msgs = [
         SystemMessagePromptTemplate.from_template(
             sys_prompt, input_variables=["topic"]
@@ -203,7 +188,7 @@ def get_riddle_generator_chat():
     prompt = ChatPromptTemplate(messages=prompt_msgs, input_variables=["topic"], )
     chain = create_structured_output_chain(
         Riddle, llm, prompt,
-        verbose=True
+        verbose=__DEBUG__
     )
     return chain
 
@@ -220,13 +205,12 @@ def get_riddle_generator():
     model_name = "OpenAI"
     llm = get_model(model_name, temperature=0.8)
 
-
     prompt = PromptTemplate(
         template=sys_prompt + "\n{format_instructions}\n",
         input_variables=["topic"],
         partial_variables={"format_instructions": RiddleParser.get_format_instructions()},
     )
-    chain = LLMChain(llm=llm, prompt=prompt, verbose=True)
+    chain = LLMChain(llm=llm, prompt=prompt, verbose=__DEBUG__)
     return chain
 
 
