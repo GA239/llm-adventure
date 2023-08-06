@@ -21,6 +21,35 @@ def get_room_by_type(room_type: str) -> Type[GeneralRoom] | Type[MathRoom] | Non
     }.get(room_type, None)
 
 
+class RoomLoopAnswer(BaseModel):
+    """Room Loop Answer"""
+    action: str = Field(
+        description="The action to take. Must be one of the valid actions")
+    similarity: float = Field(
+        description="the similarity of the main idea of the player's answer to the main idea of the correct answer "
+                    "as a value between 0 and 1")
+    answer_idea: str = Field(
+        description="the main idea of the player's answer")
+    correct_answer_idea: str = Field(
+        description="the main idea of the correct answer")
+    reply: str = Field(
+        description="Your reply to player. You must say clues in your own words instead of just copying them")
+    new_state: str = Field(
+        description="The new state, after this action. Must be one of the valid states")
+
+
+RoomLoopAnswerParser = PydanticOutputParser(pydantic_object=RoomLoopAnswer)
+
+
+class Riddle(BaseModel):
+    """A riddle that need to be solved."""
+    riddle: str = Field(description="the riddle as a question")
+    answer: str = Field(description="the answer to the riddle")
+
+
+RiddleParser = PydanticOutputParser(pydantic_object=Riddle)
+
+
 class Room(ABC):
     _riddle_generator: LLMChain = None
     """The riddle generator for this room. Generates riddle and answer"""
@@ -50,24 +79,6 @@ class Room(ABC):
             raise ValueError("answer is not generated yet")
         return self._riddle["answer"]
 
-    class RoomLoopAnswer(BaseModel):
-        """Room Loop Answer"""
-        action: str = Field(
-            description="The action to take. Must be one of the valid actions")
-        similarity: float = Field(
-            description="the similarity of the main idea of the player's answer to the main idea of the correct answer "
-                        "as a value between 0 and 1")
-        answer_idea: str = Field(
-            description="the main idea of the player's answer")
-        correct_answer_idea: str = Field(
-            description="the main idea of the correct answer")
-        reply: str = Field(
-            description="Your reply to player. You must say clues in your own words instead of just copying them")
-        new_state: str = Field(
-            description="The new state, after this action. Must be one of the valid states")
-
-    RoomLoopAnswerParser = PydanticOutputParser(pydantic_object=RoomLoopAnswer)
-
     @abstractmethod
     def _get_riddle_generator(self) -> LLMChain:
         raise NotImplementedError
@@ -79,8 +90,19 @@ class Room(ABC):
         return self._riddle_generator
 
     @abstractmethod
-    def _get_room_chain(self) -> LLMChain:
+    def generate_riddle(self):
         raise NotImplementedError
+
+    @abstractmethod
+    def _get_room_chain_from_params(self, riddle: dict, topic: str) -> LLMChain:
+        raise NotImplementedError
+
+    def _get_room_chain(self) -> LLMChain:
+        self.generate_riddle()
+        riddle = self._riddle
+        game_print_debug(f"Debug ::: Riddle :: {riddle}")
+        topic = self.room_config["topic"]
+        return self._get_room_chain_from_params(riddle=riddle, topic=topic)
 
     @property
     def room_chain(self) -> LLMChain:
@@ -93,7 +115,7 @@ class Room(ABC):
         game_print_debug(f"chain input: {p_input}")
         repl = self.room_chain.run(p_input)
         game_print_debug(f"chain repl: {type(repl)} : {repl}")
-        return self.RoomLoopAnswerParser.parse(repl).dict()
+        return RoomLoopAnswerParser.parse(repl).dict()
 
     def loop(self):
         game_print_debug("Debug::: Room Loop Started")
@@ -164,13 +186,6 @@ class GeneralRoom(Room):
     Player: ```{input}```
     """
 
-    class Riddle(BaseModel):
-        """A riddle that need to be solved."""
-        riddle: str = Field(description="the riddle as a question")
-        answer: str = Field(description="the answer to the riddle")
-
-    RiddleParser = PydanticOutputParser(pydantic_object=Riddle)
-
     def _get_riddle_generator(self) -> LLMChain:
         sys_prompt = """
         You are a world class algorithm for generating riddles. 
@@ -186,7 +201,7 @@ class GeneralRoom(Room):
         prompt = PromptTemplate(
             template=sys_prompt + "\n{format_instructions}\n",
             input_variables=["topic"],
-            partial_variables={"format_instructions": self.RiddleParser.get_format_instructions()},
+            partial_variables={"format_instructions": RiddleParser.get_format_instructions()},
         )
         return LLMChain(llm=llm, prompt=prompt, verbose=vbs)
 
@@ -194,16 +209,9 @@ class GeneralRoom(Room):
     def generate_riddle(self):
         repl = self.riddle_generator.run(topic=self.room_config["topic"])
         game_print_debug(f"chain repl: {type(repl)} : {repl}")
-        self._riddle = self.RiddleParser.parse(repl).dict()
+        self._riddle = RiddleParser.parse(repl).dict()
 
-    def _get_room_chain(self) -> LLMChain:
-        self.generate_riddle()
-        riddle = self._riddle
-        game_print_debug(f"Debug ::: Riddle :: {riddle}")
-        topic = self.room_config["topic"]
-        return self._get_general_room_chain(riddle=riddle, topic=topic)
-
-    def _get_general_room_chain(self, riddle: dict, topic: str) -> LLMChain:
+    def _get_room_chain_from_params(self, riddle: dict, topic: str) -> LLMChain:
         # TODO: check if this is needed
         langchain.llm_cache = InMemoryCache()
         vbs = verbose()
@@ -231,7 +239,7 @@ class GeneralRoom(Room):
             template=template,
             # input_variables=["history", "input"],
             input_variables=["input"],
-            partial_variables={"format_instructions": self.RoomLoopAnswerParser.get_format_instructions()},
+            partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
         )
         conversation = LLMChain(
             llm=llm,
@@ -297,7 +305,7 @@ class MathRoom(Room):
         """
         vbs = verbose()
         # model_name = "Replicate"  # Provides more interesting questions
-        model_name = "OpenAI"   # ALso provides interesting questions
+        model_name = "OpenAI"  # ALso provides interesting questions
         # but now configured to provide debug simple questions
         q_llm = get_model(model_name, temperature=0.8)
 
@@ -322,13 +330,7 @@ class MathRoom(Room):
         game_print_debug(f"chain repl: {type(repl)} : {repl}")
         self._riddle = repl
 
-    def _get_room_chain(self) -> LLMChain:
-        self.generate_riddle()
-        riddle = self._riddle
-        game_print_debug(f"Debug ::: Riddle :: {riddle}")
-        return self._get_math_room_chain(riddle=riddle)
-
-    def _get_math_room_chain(self, riddle: dict, topic: str = "Math") -> LLMChain:
+    def _get_room_chain_from_params(self, riddle: dict, topic: str = "Math") -> LLMChain:
         # TODO: check if this is needed
         langchain.llm_cache = InMemoryCache()
         vbs = verbose()
@@ -355,7 +357,7 @@ class MathRoom(Room):
         prompt = PromptTemplate(
             template=template,
             input_variables=["input"],
-            partial_variables={"format_instructions": self.RoomLoopAnswerParser.get_format_instructions()},
+            partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
         )
 
         # We don't need memory in this case, although technically It's a conversation

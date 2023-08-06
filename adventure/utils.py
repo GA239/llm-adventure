@@ -135,29 +135,8 @@ def get_local_lama_model(**kwargs):
     return CTransformers(model=model_path, model_type='llama', config=kwargs)
 
 
-def _run_chain_with_attempts(
-        chain: LLMChain,
-        chain_input: dict,
-        number_of_attempts: int = 3,
-        parser: PydanticOutputParser = None,
-):
-    # TODO: convert it to decorator
-    for attempt in range(number_of_attempts):
-        game_print_debug(f"Attempt: {attempt}")
-        try:
-            game_print_debug(f"chain input: {chain_input}")
-            repl = chain.run(chain_input)
-            game_print_debug(f"chain repl: {type(repl)} : {repl}")
-            if parser:
-                return parser.parse(repl)
-            return repl
-        except json.decoder.JSONDecodeError:
-            continue
-    raise ValueError(f"Can't parse the output after {number_of_attempts} attempts")
-
-
 def run_with_attempts(func):
-    number_of_attempts = 3
+    number_of_attempts = 3  # TODO: move to config
 
     @wraps(func)
     def with_attempts(*args, **kw):
