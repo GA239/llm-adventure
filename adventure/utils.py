@@ -1,12 +1,23 @@
+import json
 import os
+import time
 from functools import partial
+from functools import wraps
+from typing import Callable
 
 import openai
 import torch
+from langchain import LLMChain
 from langchain import OpenAI, HuggingFaceHub
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import CTransformers, HuggingFacePipeline, Replicate, Cohere
+from langchain.output_parsers import PydanticOutputParser
+from termcolor import cprint
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaForCausalLM, pipeline, BitsAndBytesConfig
+
+
+def verbose():
+    return os.getenv("__DEBUG__")
 
 
 def get_model(name, **kwargs):
@@ -31,6 +42,16 @@ def _get_default_kwargs(name):
         "HuggingFace_mbzai_lamini_flan": {"max_length": 512, "temperature": 0.7},
         "Local_lama": {'max_new_tokens': 32, 'repetition_penalty': 3.0, "temperature": 0.6},
     }.get(name, {})
+
+
+def game_print(*args, **kwargs):
+    cprint(*args, **kwargs, attrs=["bold"], color="green")
+
+
+def game_print_debug(*args, **kwargs):
+    # TODO: move to logger
+    if verbose():
+        cprint(*args, **kwargs, attrs=["bold"], color="yellow")
 
 
 def get_huggingface_model(repo_id, **kwargs):
@@ -112,3 +133,41 @@ def get_local_alpaca_model(**kwargs):
 def get_local_lama_model(**kwargs):
     model_path = get_local_model_path("Llama-2-7B-Chat-GGML")
     return CTransformers(model=model_path, model_type='llama', config=kwargs)
+
+
+def _run_chain_with_attempts(
+        chain: LLMChain,
+        chain_input: dict,
+        number_of_attempts: int = 3,
+        parser: PydanticOutputParser = None,
+):
+    # TODO: convert it to decorator
+    for attempt in range(number_of_attempts):
+        game_print_debug(f"Attempt: {attempt}")
+        try:
+            game_print_debug(f"chain input: {chain_input}")
+            repl = chain.run(chain_input)
+            game_print_debug(f"chain repl: {type(repl)} : {repl}")
+            if parser:
+                return parser.parse(repl)
+            return repl
+        except json.decoder.JSONDecodeError:
+            continue
+    raise ValueError(f"Can't parse the output after {number_of_attempts} attempts")
+
+
+def run_with_attempts(func):
+    number_of_attempts = 3
+
+    @wraps(func)
+    def with_attempts(*args, **kw):
+        """Wrapper"""
+        for attempt in range(number_of_attempts):
+            game_print_debug(f"Attempt: {attempt}")
+            try:
+                return func(*args, **kw)
+            except json.decoder.JSONDecodeError:
+                continue
+        raise ValueError(f"Can't parse the output after {number_of_attempts} attempts")
+
+    return with_attempts

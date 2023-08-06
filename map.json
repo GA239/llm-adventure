@@ -1,0 +1,22 @@
+{
+  "name": "Mind Maze",
+  "version": "0.0.1",
+  "rooms": [
+    {
+      "topic": "Astronomy and Space Science",
+      "room_type": "general"
+    },
+    {
+      "topic": "Math",
+      "room_type": "math"
+    },
+    {
+      "topic": "Programming languages, data structures, and algorithms",
+      "room_type": "general"
+    },
+    {
+      "topic": "Physics",
+      "room_type": "general"
+    }
+  ]
+}

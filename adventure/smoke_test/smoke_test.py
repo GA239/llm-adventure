@@ -3,7 +3,7 @@ import time
 from dotenv import load_dotenv, find_dotenv
 from langchain import ConversationChain, PromptTemplate
 
-from adventure.utils import get_model, get_default_kwargs
+from adventure.utils import get_model
 from langchain import PromptTemplate
 
 TEMPLATE = """
@@ -19,7 +19,7 @@ AI:"""
 
 def create_conversation_chain(model_name):
     prompt = PromptTemplate(input_variables=["history", "input"], template=TEMPLATE)
-    llm = get_model(model_name, **get_default_kwargs(model_name))
+    llm = get_model(model_name)
     return ConversationChain(llm=llm, prompt=prompt, verbose=True)
 
 

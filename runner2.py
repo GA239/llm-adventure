@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from typing import Dict, Any
 
 import langchain
 from dotenv import load_dotenv, find_dotenv
@@ -193,7 +196,7 @@ def get_riddle_generator_chat():
     return chain
 
 
-def get_riddle_generator():
+def get_riddle_generator() -> LLMChain:
     sys_prompt = """
     You are a world class algorithm for generating riddles. 
     Your task is to generate a riddle about {topic}.
@@ -214,7 +217,7 @@ def get_riddle_generator():
     return chain
 
 
-def generate_riddle(topic="programming", chat_model=False, *args, **kwargs) -> Riddle:
+def generate_riddle(topic="programming", chat_model=False, *args, **kwargs) -> dict[str, Any] | BaseModel | Any:
     chain = get_riddle_generator_chat() if chat_model else get_riddle_generator()
     for _ in range(2):
         try:
