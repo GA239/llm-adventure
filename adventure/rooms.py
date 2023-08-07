@@ -145,7 +145,7 @@ class Room(ABC):
         vbs = verbose()
 
         model_name = "OpenAI"  # adopt code to chat models
-        model_name = "ChatOpenAI"  # adopt code to chat models
+        # model_name = "ChatOpenAI"  # adopt code to chat models
         # model_name = "Replicate"
         # model_name = "Cohere"
         # model_name = "HuggingFace_google_flan"
@@ -291,7 +291,7 @@ class MathRoom(Room):
         """
         vbs = verbose()
         # model_name = "Replicate"  # Provides more interesting questions
-        model_name = "ChatOpenAI"  # ALso provides interesting questions
+        model_name = "OpenAI"  # ALso provides interesting questions
         # but now configured to provide debug simple questions
         q_llm = get_model(model_name, temperature=0.8)
 
