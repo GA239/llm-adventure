@@ -144,14 +144,14 @@ class Room(ABC):
         langchain.llm_cache = InMemoryCache()
         vbs = verbose()
 
-        model_name = "OpenAI"
+        model_name = "ChatOpenAI"  # adopt code to chat models
         # model_name = "Replicate"
         # model_name = "Cohere"
         # model_name = "HuggingFace_google_flan"
         # model_name = "HuggingFace_mbzai_lamini_flan"
         # model_name = "Local_gpt2"
         # model_name = "Local_lama"
-        llm = get_model(model_name, temperature=0.3)
+        llm = get_model(model_name, temperature=0.1)
 
         prompt = PromptTemplate(
             template=self.room_prompt_template,
@@ -193,7 +193,7 @@ class Room(ABC):
         game_print(f"Are you ready to talk about {topic}?")
         input(f"You [{' ♥ ' * hp}] : >>>")
 
-        rpl = self.sub_loop("Hello!, I'm here to solve the riddle.", "start_game")
+        rpl = self.sub_loop("Introduce yourself and give me a riddle.", "start_game")
         game_print(f"Expert: {rpl['reply']}")
 
         for attempt in range(1, NUM_ATTEMPTS_PER_ROOM+1):
@@ -290,7 +290,7 @@ class MathRoom(Room):
         """
         vbs = verbose()
         # model_name = "Replicate"  # Provides more interesting questions
-        model_name = "OpenAI"  # ALso provides interesting questions
+        model_name = "ChatOpenAI"  # ALso provides interesting questions
         # but now configured to provide debug simple questions
         q_llm = get_model(model_name, temperature=0.8)
 
