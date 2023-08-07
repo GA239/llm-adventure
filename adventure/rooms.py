@@ -28,15 +28,13 @@ class RoomLoopAnswer(BaseModel):
     """Room Loop Answer"""
     state: str = Field(
         description="The current state. Must be one of the valid states")
-    action: str = Field(
-        description="The action to take. Must be one of the valid actions")
     similarity: float = Field(
-        description="the similarity of the main idea of the player's answer to the main idea of the correct answer "
+        description="the similarity of the main idea of the player's input to the main idea of the correct answer "
                     "as a value between 0 and 1")
     reply: str = Field(
         description="Your reply to player. Does not contain answer")
     new_state: str = Field(
-        description="The new state, after this action. Must be one of the valid states")
+        description="The new state. Must be one of the valid states")
 
 
 RoomLoopAnswerParser = PydanticOutputParser(pydantic_object=RoomLoopAnswer)
@@ -80,9 +78,7 @@ class Room(ABC):
     - Don't provide answer. You can only give clues or hints.
     - Don't answer direct questions about answer.
     - Your Reply should not contain words  delimited by triple backticks: ```{answer}```.
-    - Based on the current state and players' input, choose the next state and the action to perform. 
-    The following actions are available:
-    {actions}
+    - Based on the current state and players' input, choose the next state. 
     The following states are available:
     {states}
     """
@@ -253,8 +249,9 @@ class GeneralRoom(Room):
 
     def _check_riddle_instructions(self):
         return ". ".join([
-            "if player makes a guess, compare player's input with the correct answer."
-            "If player asked a question, answer it by providing a clue."
+            "If player makes a guess, compare player's input with the correct answer",
+            "If player asked a question, answer it by providing a clue",
+            'if player guessed correctly. The next state is "finished"'
         ])
 
     @property
@@ -320,8 +317,9 @@ class MathRoom(Room):
 
     def _check_riddle_instructions(self):
         return ". ".join([
-            "If player makes a guess, consider player's input as number and compare it with the correct answer."
-            "If player asked a question, answer it by providing a clue."
+            "If player makes a guess, consider player's input as number and compare it with the correct answer",
+            "If player asked a question, answer it by providing a clue",
+            'if player guessed correctly. The next state is "finished"',
         ])
 
     @property
