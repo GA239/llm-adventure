@@ -7,3 +7,4 @@ sentencepiece
 cohere
 replicate
 termcolor
+torch

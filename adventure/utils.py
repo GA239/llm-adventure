@@ -1,17 +1,13 @@
 import json
 import os
-import time
 from functools import partial
 from functools import wraps
-from typing import Callable
 
 import openai
 import torch
-from langchain import LLMChain
 from langchain import OpenAI, HuggingFaceHub
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import CTransformers, HuggingFacePipeline, Replicate, Cohere
-from langchain.output_parsers import PydanticOutputParser
 from termcolor import cprint
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaForCausalLM, pipeline, BitsAndBytesConfig
 
@@ -36,7 +32,7 @@ def get_model(name, **kwargs):
 
 def _get_default_kwargs(name):
     return {
-        "OpenAI": {"temperature": 0.7},
+        "OpenAI": {"temperature": 0.7, "model": "text-davinci-003"},
         "Replicate": {"temperature": 0.7, "max_length": 100, "top_p": 1},
         "HuggingFace_google_flan": {"temperature": 0.5, "max_length": 1000},
         "HuggingFace_mbzai_lamini_flan": {"max_length": 512, "temperature": 0.7},
