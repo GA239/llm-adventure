@@ -29,7 +29,7 @@ class RoomLoopAnswer(BaseModel):
     state: str = Field(
         description="The current state. Must be one of the valid states")
     similarity: float = Field(
-        description="the similarity of the main idea of the player's input to the main idea of the correct answer "
+        description="The similarity of the main idea of the player's input to the main idea of the answer "
                     "as a value between 0 and 1")
     reply: str = Field(
         description="Your reply to player. Does not contain answer")
