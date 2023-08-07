@@ -144,6 +144,7 @@ class Room(ABC):
         langchain.llm_cache = InMemoryCache()
         vbs = verbose()
 
+        model_name = "OpenAI"  # adopt code to chat models
         model_name = "ChatOpenAI"  # adopt code to chat models
         # model_name = "Replicate"
         # model_name = "Cohere"
