@@ -22,5 +22,7 @@ python -m main_loop.py
 ``` 
 
 > Note: You need to set up an OpenAI API key to use this game. You can get one [here](https://beta.openai.com/).
+
 > Keys can be stored in a `.env` file in the root directory of the project.
-> Add __DEBUG__ to the `.env` file or export it to the shell to enable debug mode.
+
+> Add `__DEBUG__` to the `.env` file or export it to the shell to enable debug mode.
