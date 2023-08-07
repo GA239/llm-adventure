@@ -66,27 +66,22 @@ class Room(ABC):
     ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE = """
     You are following the following rules:
     - You are playing the question/answer game.
-    - You play the role an expert in {topic}.
-    - Your task is to check the correctness of the player's answers.
     - You must not refer to yourself in any way. Only to role.
-    - You are talking with a player.
-    - The topic of the conversation is {topic}.
-    - You can only answer questions that are asked in the context of the game.
+    - You play the role an expert in {topic}.
+    - You are talking to a player.
     - You can't pretend a player.
-    - Be short and precise in your answers.
+    - Your task is to check the correctness of the player's input or answer the question.    
+    - The topic of the conversation is {topic}.
+    - You can only reply on questions that are asked in the context of the game.
     {room_specific_instructions}
+    - Be short and precise in your replies.
     - Don't provide answer. You can only give clues or hints.
-    - Don't answer direct questions about answer.
-    - Your Reply should not contain words  delimited by triple backticks: ```{answer}```.
-    - Based on the current state and players' input, choose the next state. 
+    - Your reply should not contain words delimited by triple backticks: ```{answer}```.
+    
+    - Precise Task 1: Based on the current state and players' input, choose the next state from available states. 
     The following states are available:
     {states}
-    """
-
-    actions_str = """
-    * start_game: Introduce yourself and the topic, after give player a riddle. The next state is "guessing_riddle"
-    * guess_correct: if player guessed correctly. The next state is "finished"
-    * guess_incorrect: if player guessed incorrectly. You should give player a clue. The next state is "guessing_riddle"
+    - Precise Task 2: Based on the current state description and players' input, generate Your reply to player .
     """
 
     def _check_riddle_instructions(self):
@@ -102,7 +97,7 @@ class Room(ABC):
 
     # Used to be for memory
     history_concatenation = """Current conversation:
-    The current state of the game is "{state}"
+    The current state is "{state}"
     Player's input delimited by triple backticks: ```{input}```
     """
 
@@ -144,8 +139,9 @@ class Room(ABC):
         langchain.llm_cache = InMemoryCache()
         vbs = verbose()
 
-        model_name = "OpenAI"  # adopt code to chat models
-        # model_name = "ChatOpenAI"  # adopt code to chat models
+        model_name = "OpenAI"
+        # model_name = "ChatOpenAI"  # TODO: adopt code to chat models
+
         # model_name = "Replicate"
         # model_name = "Cohere"
         # model_name = "HuggingFace_google_flan"
@@ -220,7 +216,7 @@ class GeneralRoom(Room):
     - The player is trying to guess a riddle.
     - You have a riddle that player need to find the solution to. The riddle: "{riddle}". 
     - The riddle is related to {topic}.
-    - Compare the player's input with the correct answer. The correct answer is "{answer}".
+    - Compare the player's input with the answer. The correct answer is "{answer}".
     """
 
     def _get_riddle_generator(self) -> LLMChain:
@@ -250,7 +246,7 @@ class GeneralRoom(Room):
 
     def _check_riddle_instructions(self):
         return ". ".join([
-            "If player makes a guess, compare player's input with the correct answer",
+            "If player makes a guess, compare player's input with the answer. ",
             "If player asked a question, answer it by providing a clue",
             'if player guessed correctly. The next state is "finished"'
         ])
@@ -259,7 +255,6 @@ class GeneralRoom(Room):
     def room_prompt_template(self) -> str:
         system_prompt = self.ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
             topic=self.room_config["topic"],
-            actions=self.actions_str,
             states=self.states_str,
             answer=self.answer,
             room_specific_instructions=self.GENERAL_ROOM_SPECIFIC_INSTRUCTIONS.format(
@@ -270,6 +265,7 @@ class GeneralRoom(Room):
         )
 
         template = system_prompt + self.history_concatenation + "\n{format_instructions}\n"
+        game_print_debug(f"Room Prompt Template: {template}")
         return template
 
 
@@ -318,7 +314,8 @@ class MathRoom(Room):
 
     def _check_riddle_instructions(self):
         return ". ".join([
-            "If player makes a guess, consider player's input as number and compare it with the correct answer",
+            'Get the number from the answer.'
+            "If player makes a guess, consider player's input as number and compare it with the number from the answer",
             "If player asked a question, answer it by providing a clue",
             'if player guessed correctly. The next state is "finished"',
         ])
@@ -327,7 +324,6 @@ class MathRoom(Room):
     def room_prompt_template(self) -> str:
         system_prompt = self.ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
             topic=self.room_config["topic"],
-            actions=self.actions_str,
             states=self.states_str,
             answer=self.answer,
             room_specific_instructions=self.MATH_ROOM_SPECIFIC_INSTRUCTIONS.format(
