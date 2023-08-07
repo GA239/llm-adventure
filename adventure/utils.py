@@ -17,7 +17,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer, LlamaTokenizer, LlamaFo
 
 
 def verbose():
-    return os.getenv("__DEBUG__")
+    return True if os.getenv("__DEBUG__") else False
 
 
 def get_model(name, **kwargs):

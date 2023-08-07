@@ -21,19 +21,20 @@ def get_room_by_type(room_type: str) -> Type[GeneralRoom] | Type[MathRoom] | Non
     }.get(room_type, None)
 
 
+NUM_ATTEMPTS_PER_ROOM = 10
+
+
 class RoomLoopAnswer(BaseModel):
     """Room Loop Answer"""
+    state: str = Field(
+        description="The current state. Must be one of the valid states")
     action: str = Field(
         description="The action to take. Must be one of the valid actions")
     similarity: float = Field(
         description="the similarity of the main idea of the player's answer to the main idea of the correct answer "
                     "as a value between 0 and 1")
-    answer_idea: str = Field(
-        description="the main idea of the player's answer")
-    correct_answer_idea: str = Field(
-        description="the main idea of the correct answer")
     reply: str = Field(
-        description="Your reply to player. You must say clues in your own words instead of just copying them")
+        description="Your reply to player. Does not contain answer")
     new_state: str = Field(
         description="The new state, after this action. Must be one of the valid states")
 
@@ -64,8 +65,30 @@ class Room(ABC):
 
     _riddle: dict = None  # {"riddle": str, "answer": str}
 
+    ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE = """
+    You are following the following rules:
+    - You are playing the question/answer game.
+    - You play the role an expert in {topic}.
+    - Your task is to check the correctness of the player's answers.
+    - You must not refer to yourself in any way. Only to role.
+    - You are talking with a player.
+    - The topic of the conversation is {topic}.
+    - You can only answer questions that are asked in the context of the game.
+    - You can't pretend a player.
+    - Be short and precise in your answers.
+    {room_specific_instructions}
+    - Don't provide answer. You can only give clues or hints.
+    - Don't answer direct questions about answer.
+    - Your Reply should not contain words  delimited by triple backticks: ```{answer}```.
+    - Based on the current state and players' input, choose the next state and the action to perform. 
+    The following actions are available:
+    {actions}
+    The following states are available:
+    {states}
+    """
+
     actions_str = """
-    * start_game: only in the initial state, start the game by giving player the riddle
+    * start_game: Introduce yourself and the topic, after give player a riddle. The next state is "guessing_riddle"
     * guess_correct: if player guessed correctly. The next state is "finished"
     * guess_incorrect: if player guessed incorrectly. You should give player a clue. The next state is "guessing_riddle"
     """
@@ -76,13 +99,15 @@ class Room(ABC):
     @property
     def states_str(self):
         return f"""
-        * guessing_riddle: {self._check_riddle_instructions()} 
-        * finished: you should stop the game
+        * "start_game": 1. Introduce yourself and the topic of conversation. 2. Give player the riddle
+        * "guessing_riddle": {self._check_riddle_instructions()} 
+        * "finished": you should stop the game
         """
 
     # Used to be for memory
     history_concatenation = """Current conversation:
-    Player: ```{input}```
+    The current state of the game is "{state}"
+    Player's input delimited by triple backticks: ```{input}```
     """
 
     def __init__(self, room_config: dict):
@@ -130,11 +155,11 @@ class Room(ABC):
         # model_name = "HuggingFace_mbzai_lamini_flan"
         # model_name = "Local_gpt2"
         # model_name = "Local_lama"
-        llm = get_model(model_name, temperature=0.2)
+        llm = get_model(model_name, temperature=0.3)
 
         prompt = PromptTemplate(
             template=self.room_prompt_template,
-            input_variables=["input"],
+            input_variables=["input", "state"],
             partial_variables={"format_instructions": RoomLoopAnswerParser.get_format_instructions()},
         )
 
@@ -159,70 +184,52 @@ class Room(ABC):
         return self._room_chain
 
     @run_with_attempts
-    def sub_loop(self, p_input):
-        game_print_debug(f"chain input: {p_input}")
-        repl = self.room_chain.run(p_input)
+    def sub_loop(self, p_input, state):
+        game_print_debug(f"chain input: {p_input}, state: {state}")
+        repl = self.room_chain.run(input=p_input, state=state)
         game_print_debug(f"chain repl: {type(repl)} : {repl}")
         return RoomLoopAnswerParser.parse(repl).dict()
 
-    def loop(self):
+    def loop(self) -> int:
         game_print_debug("Debug::: Room Loop Started")
+        hp = self.room_config["hp"]
+        topic = self.room_config["topic"]
+        game_print(f"Are you ready to talk about {topic}?")
+        input(f"You [{' ♥ ' * hp}] : >>>")
 
-        rpl = self.sub_loop("Hello!, I'm here to solve the riddle.")
+        rpl = self.sub_loop("Hello!, I'm here to solve the riddle.", "start_game")
         game_print(f"Expert: {rpl['reply']}")
 
-        while True:
-            p_input = input("You: >>>")
-            rpl = self.sub_loop(p_input)
+        for attempt in range(1, NUM_ATTEMPTS_PER_ROOM+1):
+            power = NUM_ATTEMPTS_PER_ROOM - attempt
+            rpl = self.sub_loop(input(f"You [{' ♥ '* hp }] [{' ⚡ '* power }]: >>>"), rpl["new_state"])
+
+            if rpl["new_state"] == "finished":
+                game_print(f"Expert: {rpl['reply']}")
+                return attempt
+
+            if float(rpl["similarity"]) > 0.65:
+                game_print("Your guess is almost correct!")
+                game_print(f"The answer is {self.answer}")
+                return attempt
 
             game_print(f"Expert: {rpl['reply']}")
 
-            action, state = rpl["action"], rpl["new_state"]
-            if state == "finished":
-                break
-
-            similarity = float(rpl["similarity"])
-            if similarity > 0.65:
-                game_print("However, Your guess is almost correct!")
-                game_print(f"The answer is {self.answer}")
-                break
-
-        game_print("Thank you for playing!")
+        game_print(f"Expert: The number of attempts is exceeded. The answer is {self.answer}")
 
 
 class GeneralRoom(Room):
-    ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE = """
-    You are an expert in {topic}. You are following the following rules:
-    - You must not refer to yourself in any way.
-    - You can only answer questions that are asked in the context of the game.
-    - You can't pretend a player.
-    - Be short and precise in your answers.
-
-    You also follow the rules of the Adventure Game Room.
-    The rules of Adventure Game Room:
-
-    - You are talking with a player. 
+    GENERAL_ROOM_SPECIFIC_INSTRUCTIONS = """
     - The player is trying to guess a riddle.
     - You have a riddle that player need to find the solution to. The riddle: "{riddle}". 
     - The riddle is related to {topic}.
-    - You have a correct answer to the riddle. The correct answer is "{answer}".
-    - The player can ask you questions about the riddle. You can answer the questions about riddle, but don't say the answer.
-    - The player can ask you questions about the answer. Don't provide answer. You can only give clues or hints
-    - You NEVER say the precise answer to the player. You can only give clues
-    - You should choose action from available actions based on the players' input and history of conversation.
-
-    The following actions are available.
-    {actions}
-    - You should choose the next state from available states based on the action.
-
-    The following states are available
-    {states}
+    - Compare the player's input with the correct answer. The correct answer is "{answer}".
     """
 
     def _get_riddle_generator(self) -> LLMChain:
         sys_prompt = """
         You are a world class algorithm for generating riddles. 
-        Your task is to generate a riddle about {topic}.
+        Your task is to generate a riddle about the topic delimited by triple backticks: ```{topic}```.
         Your knowledge of {topic} should be used to generate riddle.
 
         Hint: The riddle should be short.
@@ -245,19 +252,23 @@ class GeneralRoom(Room):
         self._riddle = RiddleParser.parse(repl).dict()
 
     def _check_riddle_instructions(self):
-        ". ".join([
-            "if player makes a guess, compare it with the correct answer."
-            "If player asked a question, answer it by giving a clue."
+        return ". ".join([
+            "if player makes a guess, compare player's input with the correct answer."
+            "If player asked a question, answer it by providing a clue."
         ])
 
     @property
     def room_prompt_template(self) -> str:
         system_prompt = self.ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
             topic=self.room_config["topic"],
-            riddle=self.riddle,
-            answer=self.answer,
             actions=self.actions_str,
-            states=self.states_str
+            states=self.states_str,
+            answer=self.answer,
+            room_specific_instructions=self.GENERAL_ROOM_SPECIFIC_INSTRUCTIONS.format(
+                riddle=self.riddle,
+                answer=self.answer,
+                topic=self.room_config["topic"],
+            )
         )
 
         template = system_prompt + self.history_concatenation + "\n{format_instructions}\n"
@@ -265,35 +276,11 @@ class GeneralRoom(Room):
 
 
 class MathRoom(Room):
-    ADVENTURE_GAME_MATH_ROOM_PROMPT_TEMPLATE = """
-    You are following the following rules:
-    - You are playing the question/answer game.
-    - You play the role an expert in {topic}.
-    - Your task is to check the correctness of the player's answers.
-    - You must not refer to yourself in any way. Only to role.
-    - You are talking with a player.
-    - You can only answer questions that are asked in the context of the game.
-    - You can't pretend a player.
-    - Be short and precise in your answers.
-
-    You also follow the rules of the Adventure Game Math Room.
-    The rules of Adventure Game Math Room:
-
+    MATH_ROOM_SPECIFIC_INSTRUCTIONS = """
     - The player is trying to solve a math problem.
     - You have a math problem that player need to solve. The math problem: "{riddle}".
     - You have a correct answer to the math problem. The correct answer is "{answer}". It's a number.
     - You should use the term "riddle", talking about math problem.
-
-    - Don't provide answer. You can only give clues or hints.
-    - You NEVER say the precise answer to the player. You can only give clues
-    - You should choose action from available actions based on the players' input and history of conversation.
-
-    The following actions are available.
-    {actions}
-    - You should choose the next state from available states based on the action.
-
-    The following states are available
-    {states}
     """
 
     def _get_riddle_generator(self):
@@ -332,19 +319,22 @@ class MathRoom(Room):
         self._riddle = {"riddle": repl["question"], "answer": repl["answer"]}
 
     def _check_riddle_instructions(self):
-        ". ".join([
+        return ". ".join([
             "If player makes a guess, consider player's input as number and compare it with the correct answer."
-            "If player asked a question, answer it by giving a clue."
+            "If player asked a question, answer it by providing a clue."
         ])
 
     @property
     def room_prompt_template(self) -> str:
-        system_prompt = self.ADVENTURE_GAME_MATH_ROOM_PROMPT_TEMPLATE.format(
+        system_prompt = self.ADVENTURE_GAME_ROOM_PROMPT_TEMPLATE.format(
             topic=self.room_config["topic"],
-            riddle=self.riddle,
-            answer=self.answer,
             actions=self.actions_str,
-            states=self.states_str
+            states=self.states_str,
+            answer=self.answer,
+            room_specific_instructions=self.MATH_ROOM_SPECIFIC_INSTRUCTIONS.format(
+                riddle=self.riddle,
+                answer=self.answer
+            )
         )
 
         template = system_prompt + self.history_concatenation + "\n{format_instructions}\n"
