@@ -18,7 +18,7 @@ python setup.py install
 ```bash
 export OPENAI_API_KEY=...
 ...
-python -m main_loop.py
+python main_loop.py
 ``` 
 
 > Note: You need to set up an OpenAI API key to use this game. You can get one [here](https://beta.openai.com/).
